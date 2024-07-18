@@ -9,28 +9,29 @@
 #include <map>
 #define _NULLSTR_FLAG_		  "NULL"		//null string flag
 #define _EMPTY_CHAR_          '\0'			//empty char 
-#define _NULLSTR_VAL_         ""			//null string value
+#define _NULL_STRING_         ""			//null string value
 #define _TREE_DEF_VALUE_	  0			    //value for empty tree nodes
 #define _ARRAY_MAX_SIZE_      0xFFFFFF		//maximum settable size of an array to 2^24(0xFFFFFF).
+#define _STR_MAX_SIZE_		  0xFFFFFF		//maximum settable size of an string to 2^24(0xFFFFFF).
 #define _ULL_BITLEN_          0x40			//the bit length of an unsigned long long is 64 bits (0x40).
 #define _GROWTH_FACTOR_		  2.0		   	//the growth factor for array
 #define _HEAP_DEF_CAPACITY_   128			//heap default capacity
 #define _0_					  '0'			//huffman code 0
 #define _1_					  '1'			//huffman code 1		  
 
-using Byte          =  unsigned char;	    //self defined Byte type.
-using HuffmanValue  =  size_t;				//huffman tree value(weight) type.
-using HuffmanChar   =  char;			    //huffman tree encoded character type.
-using StringChar    =  char;   		        //char type for class String
+using Byte = unsigned char;	    //self defined Byte type.
+using HuffmanValue = size_t;				//huffman tree value(weight) type.
+using HuffmanChar = char;			    //huffman tree encoded character type.
+using StringChar = char;   		        //char type for class String
 
 //Array
 template<typename VT>
 class Array {
 private:
 	size_t capacity;
-	VT* container;
+	VT* container = nullptr;
 	void deepCopy(const Array<VT>& other) {
-		delete[] this->container;
+		if(this->container) delete[] this->container;
 		this->capacity = other.capacity;
 		this->container = new VT[other.capacity];
 		for (size_t i = 0; i < this->capacity; ++i)
@@ -38,7 +39,7 @@ private:
 	}
 public:
 	Array(const Array<VT>& other) { deepCopy(other); }
-	Array(size_t initSize = 0) :capacity(initSize), container(new VT[initSize]) {}
+	Array(size_t initSize = 0) :capacity(initSize), container(initSize == 0 ? nullptr: new VT[initSize]) {}
 	Array(size_t initSize, const VT& defaultValue) :capacity(initSize),
 		container(new VT[initSize]) {
 		for (size_t i = 0; i < initSize; ++i) container[i] = defaultValue;
@@ -50,29 +51,29 @@ public:
 	}
 
 	void resize(size_t newSize) {
-		if (newSize <= capacity) 
-			throw std::runtime_error("Unnecessary resize"); 
+		if (newSize <= capacity)
+			throw std::runtime_error("Unnecessary resize");
 		else {
-			VT* newContainer = new VT[newSize]; 
-			size_t copySize = std::min(capacity, newSize); 
-			for (size_t i = 0; i < copySize; ++i) 
-				newContainer[i] = container[i]; 
-			delete[] container; 
-			container = newContainer; 
-			capacity = newSize; 
-		}  
+			VT* newContainer = new VT[newSize];
+			size_t copySize = std::min(capacity, newSize);
+			for (size_t i = 0; i < copySize; ++i)
+				newContainer[i] = container[i];
+			delete[] container;
+			container = newContainer;
+			capacity = newSize;
+		}
 	}
 
-	size_t getSize() const{
+	size_t getSize() const {
 		return capacity;
-	}	
+	}
 
-	VT& operator[](const size_t index) const{ 
-		if (index >= capacity )
+	VT& operator[](const size_t index) const {
+		if (index >= capacity)
 			throw std::out_of_range("Out of index range.");
 		else return container[index];
 	}
-	
+
 	Array<VT>& operator=(const Array<VT>& other) {
 		if (this != &other) deepCopy(other);// self copy check. 
 		return *this;
@@ -87,8 +88,8 @@ template<typename VT>
 static std::ostream& operator<<(std::ostream& os, const Array<VT>& arr) {
 	size_t size = arr.getSize();
 	os << "[";
-	for (size_t i = 0; i < size - 1; ++i) 
-		if(arr[i] == _EMPTY_CHAR_) os << _NULLSTR_FLAG_ << ",";
+	for (size_t i = 0; i < size - 1; ++i)
+		if (arr[i] == _EMPTY_CHAR_) os << _NULLSTR_FLAG_ << ",";
 		else os << arr[i] << ",";
 	if (arr[size - 1] == _EMPTY_CHAR_) os << _NULLSTR_FLAG_ << "]";
 	else os << arr[size - 1] << "]";
@@ -98,44 +99,77 @@ static std::ostream& operator<<(std::ostream& os, const Array<VT>& arr) {
 //String
 class String {
 private:
-	Array<StringChar> container;
+	StringChar* container;
 	size_t length;
-public:
-	String(StringChar strChar): container(Array<StringChar>(2, _EMPTY_CHAR_)), length(1) {
-		container[0] = strChar;
+	void deepCopy(const String& string) {
+		if (this->container) delete[] this->container;
+		this->length = string.length;
+		this->container = new StringChar[string.length + 1];
+		for (size_t i = 0; i < string.length; ++i)
+			this->container[i] = string.container[i];
+		this->container[string.length] = _EMPTY_CHAR_;
 	}
-	String(size_t length = 0) :container(Array<StringChar>(length + 1, _EMPTY_CHAR_)), length(length) {}
-	String(const String& string) : container(string.container), length(string.length) {}
-	String(const StringChar string[]) {
-		for (length = 0; length < strlen(string); ++length)
-			if (string[length] == _EMPTY_CHAR_) break;
-		container = Array<StringChar>(length + 1);
+public:
+	String(StringChar strChar) : container(new StringChar[2]), length(1) {
+		container[0] = strChar;
+		container[1] = _EMPTY_CHAR_;
+	}
+
+	String(size_t length = 0) :container(new StringChar[length + 1]), length(length) {
+		for (size_t i = 0; i <= length; ++i)
+			container[i] = _EMPTY_CHAR_;
+	}
+
+	String(const String& string) :container(nullptr) {
+		deepCopy(string);
+	}
+
+	String(const StringChar string[]) :length(strlen(string)) {
+		container = new StringChar[length + 1];
+		if (length >= _STR_MAX_SIZE_) throw std::out_of_range("Out of bounds.");
 		for (size_t i = 0; i < length; ++i)
 			container[i] = string[i];
 		container[length] = _EMPTY_CHAR_;
 	}
-	~String() {}
+
+	~String() {
+		delete this->container;
+		this->container = nullptr;
+	}
 
 	size_t getLength() const { return length; };
-	void debugOutput() { std::cout << container << std::endl; }
+	void debugOutput() { 
+		size_t size = length;
+		std::cout << "[";
+		for (size_t i = 0; i < size - 1; ++i)
+			if (container[i] == _EMPTY_CHAR_) std::cout << _NULLSTR_FLAG_ << ",";
+			else std::cout << (size_t)container[i] << ",";
+		if (container[size - 1] == _EMPTY_CHAR_) std::cout << _NULLSTR_FLAG_ << "]";
+		else std::cout << (size_t)container[size - 1] << "]";
+	}
 
 	const String& operator=(const String& other) {
-		if (this == &other) return *this;// self check
-
-		// class Array performs a deep copy, and original container will be delete. 
-		this->container = other.container;
-		this->length = other.length;
+		if (this != &other) // self check 
+			deepCopy(other);
+		return *this;
 	}
 
 	const String& operator=(const StringChar string[]) {
-		return String(string);
+		size_t len = strlen(string);
+		if (this->container) delete[] this->container;
+		this->length = len;
+		this->container = new StringChar[len + 1];
+		for (size_t i = 0; i < len; ++i)
+			this->container[i] = string[i];
+		this->container[len] = _EMPTY_CHAR_;
+		return *this;
 	}
 
 	String operator+(const String& other) const {
 		size_t newLength = this->length + other.length;
 		String result(newLength + 1);
 		result.length = newLength;
-		size_t i; 
+		size_t i;
 		for (i = 0; i < this->length; ++i)
 			result.container[i] = this->container[i];
 		for (size_t j = 0; j < other.length; ++j)
@@ -145,28 +179,34 @@ public:
 	}
 
 	String operator+(StringChar string[]) const {
-		return (*this) + String(string);
+		size_t stringSize = strlen(string);
+		if (stringSize >= _STR_MAX_SIZE_) throw std::out_of_range("Out of bounds.");
+		size_t oriLength = this->length;
+		size_t newLength = +stringSize;
+		String result(newLength + 1);
+		result.length = newLength;
+		for (size_t i = 0; i < oriLength; ++i)
+			result.container[i] = this->container[i];
+		for (size_t j = 0; j < stringSize; ++j)
+			result.container[oriLength + j] = string[j];
+		result.container[newLength] = _EMPTY_CHAR_;
+		return result;
 	}
 
 	String& operator+=(const String& other) {
-		size_t oriLength = this->length;
-		size_t newLength = oriLength + other.length; 
-		this->length = newLength;  
-		this->container.resize(newLength + 1);// 1 more space for '\0'  
-		for (size_t j = 0; j < other.length; ++j) 
-			this->container[oriLength + j] = other.container[j]; 
-		this->container[newLength] = _EMPTY_CHAR_; 
-		return *this;
+		*this = *this + other;
+		return (*this);
 	}
 
-	String& operator+=(StringChar string) {
-		return (*this) += String(string);
+	String& operator+=(StringChar string[]) {
+		*this = *this + string;
+		return (*this);
 	}
 
 	friend std::ostream& operator<<(std::ostream& os, const String& string);
 
 	StringChar& operator[](const size_t index) const {
-		if (index >= length)
+		if (index > length)
 			throw std::out_of_range("Out of index range.");
 		else return container[index];
 	}
@@ -175,8 +215,8 @@ public:
 		if (this->length != other.length)
 			return false;
 		/*
-		* Internal access should be via container, 
-		* and using overload op"[]" directly will 
+		* Internal access should be via container,
+		* and using overload op"[]" directly will
 		* increase the cost of security validation.
 		*/
 		for (size_t i = 0; i < this->length; ++i)
@@ -185,16 +225,11 @@ public:
 		return true;
 	}
 	bool operator==(const StringChar string[]) const {
-		String other = String(string);
-		if (this->length != other.length)
- 			return false;
-		/*
-		* Internal access should be via container,
-		* and using overload op"[]" directly will
-		* increase the cost of security validation.
-		*/
+		size_t length = strlen(string);
+		if (length >= _STR_MAX_SIZE_) throw std::out_of_range("Out of bounds.");
+		if (this->length != length) return false;
 		for (size_t i = 0; i < this->length; ++i)
-			if (this->container[i] != other.container[i])
+			if (this->container[i] != string[i])
 				return false;
 		return true;
 	}
@@ -214,10 +249,10 @@ static std::ostream& operator<<(std::ostream& os, const String& string) {
 }
 
 /* === English character set only[BEGIN] === */
-static const StringChar		ECSO_NULL    = '$';
-static const size_t			ECSO_INVI	 = 0;       //Invalid Index
-static const size_t			ECSO_SIZE    = 86;
-static const StringChar		ECSO_CHAR[]  = 
+static const StringChar		ECSO_NULL = '$';
+static const size_t			ECSO_INVI = 0;       //Invalid Index
+static const size_t			ECSO_SIZE = 86;
+static const StringChar		ECSO_CHAR[] =
 {
 	_EMPTY_CHAR_,
 	'a', 'b', 'c', 'd', 'e', 'f', 'g',
@@ -234,7 +269,7 @@ static const StringChar		ECSO_CHAR[]  =
 	'@', '[', '\\',']', '^', '_', '`',
 	'{', '|', '}', '~', ' '
 };
-static const size_t			ECSO_STA []  = 
+static const size_t			ECSO_STA[] =
 {
 	0,
 	800 , 150 , 300 , 450 , 1300, 250 , 200 ,	// a-g
@@ -251,8 +286,8 @@ static const size_t			ECSO_STA []  =
 	1   , 1   , 1   , 1   , 1   , 5   , 1   ,	// @-\]
 	1   , 1   , 1   , 1   , 3500				// ^-~
 };
-static const String			ECSO_NAME	 = "ECSO_NAME";
-static const size_t			ECSO_MAPSIZE = 127;
+static const String			ECSO_NAME = "ECSO_NAME";
+static const size_t			ECSO_MAPSIZE = 128;
 static const size_t			ECSO_MAP[] =
 {
 	ECSO_INVI,ECSO_INVI,ECSO_INVI,ECSO_INVI,ECSO_INVI,ECSO_INVI,ECSO_INVI,ECSO_INVI,
@@ -272,7 +307,7 @@ static const size_t			ECSO_MAP[] =
 
 
 /*
-* Flag Description: 
+* Flag Description:
 *	/////////////////////////////////////////////////////////////////////
 *	// The Flag class provides a mechanism for managing a large number //
 *	// of boolean flags using bit operations.   Flags are stored within//
@@ -299,29 +334,29 @@ public:
 	Flag& operator=(const Flag&) = delete;
 
 	void mark(const unsigned int index) {
-		if (index > capacity) 
-			throw std::out_of_range("Unable to access this position: [index].");  
+		if (index > capacity)
+			throw std::out_of_range("Unable to access this position: [index].");
 
 		unsigned int blockIndex = index / _ULL_BITLEN_;
-		unsigned int innerIndex = index % _ULL_BITLEN_; 
+		unsigned int innerIndex = index % _ULL_BITLEN_;
 		flag[blockIndex] |= (1ULL << innerIndex);
 	}
 
 	void revokeMark(const unsigned int index) {
-		if (index > capacity) 
-			throw std::out_of_range("Unable to access this position: [index]."); 
+		if (index > capacity)
+			throw std::out_of_range("Unable to access this position: [index].");
 
-		unsigned int blockIndex = index / _ULL_BITLEN_; 
-		unsigned int innerIndex = index % _ULL_BITLEN_; 
+		unsigned int blockIndex = index / _ULL_BITLEN_;
+		unsigned int innerIndex = index % _ULL_BITLEN_;
 		flag[blockIndex] &= ~(1ULL << innerIndex);
 	}
 
 	bool isMarked(const unsigned int index) const {
-		if (index > capacity) 
-			throw std::out_of_range("Unable to access this position: [index]."); 
+		if (index > capacity)
+			throw std::out_of_range("Unable to access this position: [index].");
 
-		unsigned int blockIndex = index / _ULL_BITLEN_; 
-		unsigned int innerIndex = index % _ULL_BITLEN_; 
+		unsigned int blockIndex = index / _ULL_BITLEN_;
+		unsigned int innerIndex = index % _ULL_BITLEN_;
 		return (flag[blockIndex] & (1ULL << innerIndex)) != 0;
 	}
 
@@ -331,38 +366,38 @@ public:
 };
 
 //Stack
-template<typename VT> 
+template<typename VT>
 class Stack {
 private:
 	size_t currentSize;
-	const size_t capacity; 
+	const size_t capacity;
 	VT* container;
 public:
 	Stack(size_t capacity) : currentSize(0), capacity(capacity), container(new VT[capacity]) {}
 	~Stack() { delete[] container; }
 	Stack(const Stack&) = delete;
-	Stack& operator=(const Stack&) = delete; 
+	Stack& operator=(const Stack&) = delete;
 
 	void push(const VT& value) {
-		if (isFull()) 
+		if (isFull())
 			throw std::out_of_range("Unable to push data to full stack.");
 		else {
-			container[currentSize] = value; 
-			++currentSize; 
+			container[currentSize] = value;
+			++currentSize;
 		}
 	}
 
 	void pop() {
-		if (isEmpty()) 
+		if (isEmpty())
 			throw std::underflow_error("Unable to pop from an empty stack.");
-		else --currentSize; 
+		else --currentSize;
 	}
 
-	const VT& top() const{
-		if (isEmpty())  
+	const VT& top() const {
+		if (isEmpty())
 			throw std::underflow_error("Unable to access the top of an empty stack.");
-		return container[currentSize - 1]; 
-	} 
+		return container[currentSize - 1];
+	}
 
 	bool isEmpty() const {
 		return currentSize == 0;
@@ -381,52 +416,52 @@ public:
 template <typename VT>
 class Queue {
 private:
-    VT* container;
-    const size_t capacity;
+	VT* container;
+	const size_t capacity;
 	size_t frontPointer, rearPointer, currentSize;
 
 public:
-    Queue(size_t capacity) : capacity(capacity), frontPointer(0), rearPointer(0), currentSize(0), container(new VT[capacity]) {}
-    ~Queue() { delete[] container; }
-    Queue(const Queue&) = delete;
-    Queue& operator=(const Queue&) = delete;
+	Queue(size_t capacity) : capacity(capacity), frontPointer(0), rearPointer(0), currentSize(0), container(new VT[capacity]) {}
+	~Queue() { delete[] container; }
+	Queue(const Queue&) = delete;
+	Queue& operator=(const Queue&) = delete;
 
-    void push(const VT& value) {
-        if (isFull()) {
-            throw std::out_of_range("Unable to push data to full queue.");
-        }
-        container[rearPointer] = value;
-        rearPointer = (rearPointer + 1) % capacity;
-        currentSize++;
-    }
+	void push(const VT& value) {
+		if (isFull()) {
+			throw std::out_of_range("Unable to push data to full queue.");
+		}
+		container[rearPointer] = value;
+		rearPointer = (rearPointer + 1) % capacity;
+		currentSize++;
+	}
 
-    void pop() {
-        if (isEmpty()) {
-            throw std::underflow_error("Unable to access the front of an empty queue.");
-        }
-        VT result = container[frontPointer];
-        frontPointer = (frontPointer + 1) % capacity;
-        --currentSize;
-    }
+	void pop() {
+		if (isEmpty()) {
+			throw std::underflow_error("Unable to access the front of an empty queue.");
+		}
+		VT result = container[frontPointer];
+		frontPointer = (frontPointer + 1) % capacity;
+		--currentSize;
+	}
 
-    VT front() const {
-        if (isEmpty()) {
-            throw std::underflow_error("Unable to access the front of an empty queue.");
-        }
-        return container[frontPointer];
-    }
+	VT front() const {
+		if (isEmpty()) {
+			throw std::underflow_error("Unable to access the front of an empty queue.");
+		}
+		return container[frontPointer];
+	}
 
-    bool isEmpty() const {
-        return currentSize == 0;
-    }
+	bool isEmpty() const {
+		return currentSize == 0;
+	}
 
-    bool isFull() const {
-        return currentSize == capacity;
-    }
+	bool isFull() const {
+		return currentSize == capacity;
+	}
 
-    size_t getSize() const { 
-        return currentSize;
-    }
+	size_t getSize() const {
+		return currentSize;
+	}
 };
 
 //RCMatrix(Triplet Compressed Matrix)
@@ -443,12 +478,12 @@ public:
 };
 
 //BiTreeNode(Binary Tree Node)
-template<typename VT> 
+template<typename VT>
 class BiTreeNode {
-public: 
+public:
 	VT value;
 	BiTreeNode<VT>* lChild, * rChild;
-	BiTreeNode(const VT& val): value(val), lChild(nullptr), rChild(nullptr) {}
+	BiTreeNode(const VT& val) : value(val), lChild(nullptr), rChild(nullptr) {}
 	~BiTreeNode() {}
 	static void deleteTree(BiTreeNode<VT>* root) {
 		if (!root) return;
@@ -456,15 +491,15 @@ public:
 		deleteTree(root->rChild);
 		delete root;
 	}
-}; 
+};
 
 //PBiTreeNode(Binary Tree Node with Parent Pointer)
 template<typename VT>
-class PBiTreeNode: public BiTreeNode<VT> {
+class PBiTreeNode : public BiTreeNode<VT> {
 public:
 	PBiTreeNode<VT>* parent;
-	PBiTreeNode(VT val): BiTreeNode<VT>(val), parent(nullptr){}
-}; 
+	PBiTreeNode(VT val) : BiTreeNode<VT>(val), parent(nullptr) {}
+};
 
 //ABiTree(Array-based Binary Tree)
 template<typename NodeType>
@@ -483,17 +518,17 @@ public:
 	const size_t rootIndex = 1;
 
 	ABiTree(size_t capacity) : currentSize(0), capacity(capacity),
-		container(new NodeType[capacity + 1]), nodeFlag(Flag(capacity)){}
+		container(new NodeType[capacity + 1]), nodeFlag(Flag(capacity)) {}
 
-	bool isExist(const size_t index) const{ 
+	bool isExist(const size_t index) const {
 		return index <= currentSize && nodeFlag.isMarked(index) && index > 0;
 	}
 
-	size_t getLeftChild(const size_t rootIndex) const{
+	size_t getLeftChild(const size_t rootIndex) const {
 		return rootIndex * 2;
 	}
 
-	size_t getRightChildIndex(const size_t rootIndex) const{ 
+	size_t getRightChildIndex(const size_t rootIndex) const {
 		return rootIndex * 2 + 1;
 	}
 
@@ -652,25 +687,24 @@ private:
 		}
 	}
 	void seqlize() {
-		for (size_t i = currentSize / 2; i > 0; --i) 
+		for (size_t i = currentSize / 2; i > 0; --i)
 			bottom(i);
 	}
 public:
 	//Empty Heap
 	AHeap() :currentSize(0), container(Array<VT>(_HEAP_DEF_CAPACITY_)) {}
 	//Sequenced Heap 
-	AHeap(Array<VT> data) :currentSize(data.getSize()), 
+	AHeap(Array<VT> data) :currentSize(data.getSize()),
 		container(Array<VT>(data.getSize() > 0 ? data.getSize() + 1 : _HEAP_DEF_CAPACITY_)) {
 		for (size_t i = 1; i <= data.getSize(); ++i)
 			container[i] = data[i - 1];
 		seqlize();
 	}
-	AHeap(const AHeap&) = delete;
 	AHeap& operator=(const AHeap&) = delete;
-	
+
 	void push(const VT& value) {
 		if (currentSize + 1 == container.getSize()) container.autoExpand();
-		++currentSize; 
+		++currentSize;
 		container[currentSize] = value;
 		upper(currentSize);
 	}
@@ -706,15 +740,171 @@ private:
 public:
 };
 
+// HTreeNode(HuffmanTree Node)
+class HTreeNode {
+public:
+	HuffmanValue value;
+	BiTreeNode<String>* root;
+	friend bool operator<(const HTreeNode& lhs, const HTreeNode& rhs) {
+		return lhs.value > rhs.value;
+	}
 
+	friend bool operator>(const HTreeNode& lhs, const HTreeNode& rhs) {
+		return lhs.value < rhs.value;
+	}
 
+	friend bool operator==(const HTreeNode& lhs, const HTreeNode& rhs) {
+		return lhs.value == rhs.value;
+	}
 
-/// huffmantree
-/// here (2 be corrected.)
-/// huffmantree
+	HTreeNode(const String& encodedChar = _NULL_STRING_, const HuffmanValue& value = _TREE_DEF_VALUE_) :
+		value(value), root(new BiTreeNode<String>(encodedChar)) {}
+};
+// Huffman Dictionary
+class HuffmanDictionary {
+private:
+	size_t charsetSize;
+	Array<size_t> statistic;
+	Array<size_t> charMap;
+	Array<StringChar> dictionary;
+	String name;
+public:
+	HuffmanDictionary(String name, size_t charsetSize, size_t mapSize,
+		size_t sta[], StringChar dic[], size_t map[]) :
+		charsetSize(charsetSize), statistic(Array<size_t>(charsetSize)),
+		dictionary(Array<StringChar>(charsetSize)), charMap(Array<size_t>(mapSize)) {
+		for (size_t i = 0; i < charsetSize; ++i) {
+			statistic[i] = sta[i];
+			dictionary[i] = dic[i];
+		}
+		for (size_t i = 0; i < mapSize; ++i) charMap[i] = map[i];
+	}
 
+	HuffmanDictionary(const String name, const size_t charsetSize, const size_t mapSize,
+		const size_t sta[], const StringChar dic[], const size_t map[]) :
+		charsetSize(charsetSize), statistic(Array<size_t>(charsetSize)),
+		dictionary(Array<StringChar>(charsetSize)), charMap(Array<size_t>(mapSize)) {
+		for (size_t i = 0; i < charsetSize; ++i) {
+			statistic[i] = sta[i];
+			dictionary[i] = dic[i];
+		}
+		for (size_t i = 0; i < mapSize; ++i) charMap[i] = map[i];
+	}
 
+	size_t getCharsetSize() { return charsetSize; }
+	StringChar getChar(const size_t index) const {
+		if (index >= charsetSize) throw std::out_of_range("Unable to access out-of-bounds value.");
+		else return dictionary[index];
+	}
+	size_t getWeight(const size_t index) const {
+		if (index >= charsetSize) throw std::out_of_range("Unable to access out-of-bounds value.");
+		else return statistic[index];
+	}
+	size_t getMapIndex(const StringChar charIndex) const {
+		if (charIndex >= charMap.getSize()) throw std::out_of_range("Unable to access out-of-bounds value.");
+		else return charMap[charIndex];
+	}
+};
+//English character set only
+static HuffmanDictionary HUFF_ECSO =
+HuffmanDictionary(ECSO_NAME, ECSO_SIZE, ECSO_MAPSIZE, ECSO_STA, ECSO_CHAR, ECSO_MAP);
+//SHuffmanTree(Static Encoding Huffman Tree)
+class SEHuffmanTree {
+private:
+	BiTreeNode<String>* root;
+	Array<String> codeList;
+	HuffmanDictionary dictionary;
+	void buildCodeTree(BiTreeNode<String>* root, String pathCode) {
+		//Check thoroughly
+		if (!root) {
+			std::cout << "May some potential risks here." << std::endl;
+			return;
+		}
 
+		if (root->value == _NULL_STRING_) {
+			buildCodeTree(root->lChild, pathCode + "0");
+			buildCodeTree(root->rChild, pathCode + "1");
+		}
+		else {
+			//Check thoroughly
+			if (root->lChild || root->rChild || root->value.getLength() != 1)
+				std::cout << "May some potential risks here." << std::endl;
+			size_t index = dictionary.getMapIndex(root->value[0]);
+			codeList[index] = pathCode;
+		}
+	}
+public:
+	SEHuffmanTree(HuffmanDictionary dictionary = HUFF_ECSO) :dictionary(dictionary) {
+		Array<HTreeNode> huffmanTree = Array<HTreeNode>(dictionary.getCharsetSize());
+		codeList = Array<String>(dictionary.getCharsetSize());
+
+		for (size_t i = 0; i < dictionary.getCharsetSize(); ++i)
+			huffmanTree[i] = HTreeNode(dictionary.getChar(i), dictionary.getWeight(i));
+
+		AHeap<HTreeNode> priorityQueue = AHeap<HTreeNode>(huffmanTree);
+		while (priorityQueue.getSize() > 1) {
+			HTreeNode tree1 = priorityQueue.top();
+			priorityQueue.pop();
+			HTreeNode tree2 = priorityQueue.top();
+			priorityQueue.pop();
+
+			HTreeNode newTree = HTreeNode(_NULL_STRING_, tree1.value + tree2.value);
+			newTree.root->lChild = tree1.root;
+			newTree.root->rChild = tree2.root;
+			priorityQueue.push(newTree);
+		}
+		root = priorityQueue.top().root;
+		buildCodeTree(root, _NULL_STRING_);
+
+		for (size_t i = 0; i < codeList.getSize(); ++i) {
+			std::cout << dictionary.getChar(i) << ":" << codeList[i] << std::endl;
+		}
+	}
+	~SEHuffmanTree() { BiTreeNode<String>::deleteTree(this->root); }
+
+	String encode(const String& string) {
+		String result = _NULL_STRING_;
+		size_t index;
+		for (size_t i = 0; i < string.getLength(); ++i) {
+			index = dictionary.getMapIndex(string[i]);
+			result += codeList[index];
+		}
+		return result;
+	}
+
+	String decode(const String& string) {
+		String result = _NULL_STRING_;
+		BiTreeNode<String>* pr = root;
+		for (size_t i = 0; i <= string.getLength(); ++i) {
+			if (!pr) throw std::runtime_error("Unknown error.");
+			else {
+				if (!pr->lChild && !pr->rChild) {
+					result += pr->value;
+					pr = root;
+				}
+				if (string[i] == _0_)
+					pr = pr->lChild;
+				else if (string[i] == _1_)
+					pr = pr->rChild;
+			}
+		}
+		return result;
+	}
+
+};
+//DHuffmanTree(Dynamic Encoding Huffman Tree)
+class DEHuffmanTree {
+private:
+	BiTreeNode<HuffmanChar>* root;
+	size_t charSetSize;
+public:
+	//encode build.
+	DEHuffmanTree(std::string code) {
+
+	}
+
+	//decode build
+};
 
 //AMatGraph(AdjacencyMatrix Graph)
 template<typename VT>
@@ -754,7 +944,7 @@ public:
 * ///////////////////////////////////////////////////////////////////
 */
 template<typename VT>
-class CFSGraph { 
+class CFSGraph {
 private:
 public:
 };
@@ -768,7 +958,7 @@ public:
 
 /*
 * RBTree(Red-Black Tree) Description:
-* ///////////////////////////////////////////////////////////////////////// 
+* /////////////////////////////////////////////////////////////////////////
 * // The RBTree class is intended to implement a Red-Black Tree, a type  //
 * // of self-balancing binary. It maintains a balanced tree by enforcing //
 * // a set of properties, ensuring that the longest path from the root to//
@@ -776,8 +966,8 @@ public:
 * // efficient search, insert, and delete operations.                    //
 * /////////////////////////////////////////////////////////////////////////
 */
-template<typename VT> 
-class RBTree { 
+template<typename VT>
+class RBTree {
 private:
 public:
 };
